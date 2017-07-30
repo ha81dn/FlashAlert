@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">FlashAlert</string>
+    <string name="pref_header_notifications">Benachrichtigungen</string>
+    <string name="setting_delete">(keine, Einstellung wird beim Verlassen gelöscht)</string>
+    <string name="package_null">(Einstellung löschen)</string>
+
+    <string name="notification_package">Benachrichtigende App</string>
+    <string name="notification_flash_beat">Blitz-/Pausentakt (in ms, kommagetrennt)</string>
+    <string name="notification_words_include">Inklusivwörter (kommagetrennt)</string>
+    <string name="notification_words_exclude">Exklusivwörter (kommagetrennt)</string>
+
+</resources>
