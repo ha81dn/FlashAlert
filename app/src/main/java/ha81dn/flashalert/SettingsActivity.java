@@ -8,9 +8,6 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.EditTextPreference;
@@ -18,13 +15,9 @@ import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
-import android.preference.PreferenceScreen;
-import android.support.v7.app.ActionBar;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
-import android.preference.RingtonePreference;
-import android.text.TextUtils;
-import android.view.MenuItem;
+import android.preference.SwitchPreference;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -67,6 +60,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                                 ? listPreference.getEntries()[index]
                                 : preference.getContext().getResources().getString(R.string.setting_delete));
 
+            } else if (preference instanceof SwitchPreference) {
+                return true;
             } else {
                 // For all other preferences, set the summary to the value's
                 // simple string representation.
@@ -83,44 +78,6 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     private static boolean isXLargeTablet(Context context) {
         return (context.getResources().getConfiguration().screenLayout
                 & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_XLARGE;
-    }
-
-    /**
-     * Binds a preference's summary to its value. More specifically, when the
-     * preference's value is changed, its summary (line of text below the
-     * preference title) is updated to reflect the value. The summary is also
-     * immediately updated upon calling this method. The exact display format is
-     * dependent on the type of preference.
-     *
-     * @see #sBindPreferenceSummaryToValueListener
-     */
-    private static void bindPreferenceSummaryToValue(Preference preference) {
-        // Set the listener to watch for value changes.
-        preference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
-        // Trigger the listener immediately with the preference's
-        // current value.
-        sBindPreferenceSummaryToValueListener.onPreferenceChange(preference,
-                PreferenceManager
-                        .getDefaultSharedPreferences(preference.getContext())
-                        .getString(preference.getKey(), ""));
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setupActionBar();
-    }
-
-    /**
-     * Set up the {@link android.app.ActionBar}, if the API is available.
-     */
-    private void setupActionBar() {
-        ActionBar actionBar = getSupportActionBar();
-        if (actionBar != null) {
-            // Show the Up button in the action bar.
-            //actionBar.setDisplayHomeAsUpEnabled(true);
-        }
     }
 
     /**
@@ -144,6 +101,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      * This method stops fragment injection in malicious applications.
      * Make sure to deny any unknown fragments here.
      */
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     protected boolean isValidFragment(String fragmentName) {
         return PreferenceFragment.class.getName().equals(fragmentName)
                 || NotificationPreferenceFragment.class.getName().equals(fragmentName);
@@ -153,7 +111,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      * This fragment shows notification preferences only. It is used when the
      * activity is showing a two-pane settings UI.
      */
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
     public static class NotificationPreferenceFragment extends PreferenceFragment {
         protected static void setListPreferenceData(Context context, ListPreference lp) {
             final PackageManager pm = context.getPackageManager();
@@ -187,7 +145,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             setHasOptionsMenu(true);
 
             final Context context = getActivity();
-            EditTextPreference editTextBoxPreference = null;
+            EditTextPreference editTextBoxPreference;
+            SwitchPreference switchPreference;
             String packageName = "";
             String flashBeat = "";
             String includeWords = "";
@@ -261,6 +220,12 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                             editTextBoxPreference.setSummary(excludeWords);
                             editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
                             cat.addPreference(editTextBoxPreference);
+
+                            switchPreference = new SwitchPreference(context);
+                            switchPreference.setKey(prefKey + "_5display");
+                            switchPreference.setTitle(getString(R.string.notification_display));
+                            switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                            cat.addPreference(switchPreference);
                         }
                     }
                     notFirstItem = true;
@@ -278,6 +243,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                     if (packageName.equals("")) prefs.edit().remove(key).apply();
                 } else if (key.endsWith("_4exclude")) {
                     excludeWords = value;
+                    if (packageName.equals("")) prefs.edit().remove(key).apply();
+                } else if (key.endsWith("_5display")) {
                     if (packageName.equals("")) prefs.edit().remove(key).apply();
                 }
             }
@@ -323,6 +290,12 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             editTextBoxPreference.setSummary("");
             editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
             cat.addPreference(editTextBoxPreference);
+
+            switchPreference = new SwitchPreference(context);
+            switchPreference.setKey(prefKey + "_5display");
+            switchPreference.setTitle(getString(R.string.notification_display));
+            switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+            cat.addPreference(switchPreference);
 
             //bindPreferenceSummaryToValue(findPreference("notifications_new_message_ringtone"));
         }

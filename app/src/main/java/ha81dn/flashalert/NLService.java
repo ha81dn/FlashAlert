@@ -1,23 +1,16 @@
 package ha81dn.flashalert;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.hardware.camera2.CameraManager;
-import android.hardware.Camera;
 import android.hardware.display.DisplayManager;
-import android.os.Build;
-import android.os.IBinder;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
-import android.util.Log;
 import android.view.Display;
-import android.widget.Toast;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -27,11 +20,21 @@ public class NLService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        boolean hasFlashed = false;
+        String[] list = {};
+        CameraManager cm = null;
+
+        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        PowerManager.WakeLock wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "sbnWakeLock");
+        wakeLock.acquire();
         try {
+            boolean isDisplayOn = true;
             DisplayManager dm = (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
             for (Display display : dm.getDisplays()) {
                 int state = display.getState();
-                if (state != Display.STATE_OFF && state != Display.STATE_DOZE && state != Display.STATE_DOZE_SUSPEND) return;
+                if (isDisplayOn)
+                    isDisplayOn = state != Display.STATE_OFF && state != Display.STATE_DOZE && state != Display.STATE_DOZE_SUSPEND;
+                if (!isDisplayOn) break;
             }
 
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -41,11 +44,11 @@ public class NLService extends NotificationListenerService {
             String flashBeat = "";
             String includeWords = "";
             String excludeWords = "";
+            String displayOn = "";
             String value;
             boolean notFirstItem = false;
             boolean skip;
             boolean flashNow;
-            boolean isTorchOn;
             long sleepMillis;
             Map<String,?> keys = prefs.getAll();
             SortedSet<String> sortedKeys = new TreeSet<>(keys.keySet());
@@ -78,20 +81,16 @@ public class NLService extends NotificationListenerService {
                                         }
                                     }
                                 }
-                                if (!skip) {
+                                if (!skip && (!isDisplayOn || displayOn.equals("true"))) {
                                     flashNow = true;
-                                    try {
-                                        isTorchOn = Camera.open().getParameters().getFlashMode().equals("torch");
-                                    } catch (Exception ignore) {
-                                        isTorchOn = false;
-                                    }
-                                    CameraManager cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-                                    String[] list = cm.getCameraIdList();
+                                    cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+                                    list = cm.getCameraIdList();
                                     for (String item : flashBeat.split(",")) {
                                         if (flashNow) {
                                             for (String id : list) {
                                                 try {
-                                                    cm.setTorchMode(id, !isTorchOn);
+                                                    hasFlashed = true;
+                                                    cm.setTorchMode(id, true);
                                                 } catch (Exception ignore) {}
                                             }
                                         }
@@ -104,7 +103,7 @@ public class NLService extends NotificationListenerService {
                                         if (flashNow) {
                                             for (String id : list) {
                                                 try {
-                                                    cm.setTorchMode(id, isTorchOn);
+                                                    cm.setTorchMode(id, false);
                                                 } catch (Exception ignore) {}
                                             }
                                         }
@@ -119,15 +118,30 @@ public class NLService extends NotificationListenerService {
                         flashBeat = "";
                         includeWords = "";
                         excludeWords = "";
+                        displayOn = "";
                     } else if (key.endsWith("_2beat")) {
                         flashBeat = value;
                     } else if (key.endsWith("_3include")) {
                         includeWords = value;
                     } else if (key.endsWith("_4exclude")) {
                         excludeWords = value;
+                    } else if (key.endsWith("_5display")) {
+                        displayOn = value;
                     }
                 } catch (Exception ignore) {}
             }
         } catch (Exception ignore) {}
+        try {
+            if (hasFlashed) {
+                for (String id : list) {
+                    try {
+                        cm.setTorchMode(id, false);
+                    } catch (Exception ignore) {
+                    }
+                }
+            }
+        } catch (Exception ignore) {
+        }
+        wakeLock.release();
     }
 }
