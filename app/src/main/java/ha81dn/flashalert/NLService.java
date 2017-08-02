@@ -1,14 +1,18 @@
 package ha81dn.flashalert;
 
+import android.app.Notification;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.display.DisplayManager;
+import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
+import android.text.TextUtils;
 import android.view.Display;
 
 import java.util.Map;
@@ -21,6 +25,9 @@ public class NLService extends NotificationListenerService {
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         boolean hasFlashed = false;
+        int flashCount = 0;
+        String sbnPackageName = "";
+        String sbnText = "";
         String[] list = {};
         CameraManager cm = null;
 
@@ -38,8 +45,33 @@ public class NLService extends NotificationListenerService {
             }
 
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            String sbnPackageName = sbn.getPackageName();
-            String sbnText = sbn.getNotification().tickerText == null ? "" : sbn.getNotification().tickerText.toString();
+            sbnPackageName = sbn.getPackageName();
+
+            Bundle extras = sbn.getNotification().extras;
+            CharSequence chars = extras.getCharSequence(Notification.EXTRA_TEXT);
+            if (!TextUtils.isEmpty(chars)) sbnText += chars.toString() + '\n';
+            chars = extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+            if (!TextUtils.isEmpty(chars)) sbnText += chars.toString() + '\n';
+            chars = extras.getCharSequence(Notification.EXTRA_INFO_TEXT);
+            if (!TextUtils.isEmpty(chars)) sbnText += chars.toString() + '\n';
+            chars = extras.getCharSequence(Notification.EXTRA_SUB_TEXT);
+            if (!TextUtils.isEmpty(chars)) sbnText += chars.toString() + '\n';
+            chars = extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT);
+            if (!TextUtils.isEmpty(chars)) sbnText += chars.toString() + '\n';
+            CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+            if (lines != null && lines.length >= 1) {
+                StringBuilder sb = new StringBuilder();
+                for (CharSequence msg : lines)
+                    if (!TextUtils.isEmpty(msg)) {
+                        sb.append(msg.toString().trim());
+                        sb.append('\n');
+                    }
+                if (sb.length() >= 1)
+                    sbnText += sb.toString();
+            }
+            if (sbnText.length() >= 1 && sbnText.substring(sbnText.length() - 1, sbnText.length()).equals("\n"))
+                sbnText = sbnText.substring(0, sbnText.length() - 1);
+
             String packageName = "";
             String flashBeat = "";
             String includeWords = "";
@@ -87,6 +119,7 @@ public class NLService extends NotificationListenerService {
                                     list = cm.getCameraIdList();
                                     for (String item : flashBeat.split(",")) {
                                         if (flashNow) {
+                                            flashCount++;
                                             for (String id : list) {
                                                 try {
                                                     hasFlashed = true;
@@ -109,7 +142,7 @@ public class NLService extends NotificationListenerService {
                                         }
                                         flashNow = !flashNow;
                                     }
-                                    return;
+                                    break;
                                 }
                             }
                         }
@@ -140,6 +173,13 @@ public class NLService extends NotificationListenerService {
                     }
                 }
             }
+        } catch (Exception ignore) {
+        }
+        try {
+            PackageManager pm = this.getPackageManager();
+            DatabaseHandler log = new DatabaseHandler(this);
+            log.addLogEntry(pm.getApplicationLabel(pm.getApplicationInfo(sbnPackageName, 0)).toString(), sbnText, flashCount >= 1 ? new String(new char[flashCount]).replace("\0", "⚡") : "");
+            log.close();
         } catch (Exception ignore) {
         }
         wakeLock.release();

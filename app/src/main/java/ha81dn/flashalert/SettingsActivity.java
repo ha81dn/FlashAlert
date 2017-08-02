@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.EditTextPreference;
@@ -104,7 +105,58 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     protected boolean isValidFragment(String fragmentName) {
         return PreferenceFragment.class.getName().equals(fragmentName)
+                || LogPreferenceFragment.class.getName().equals(fragmentName)
                 || NotificationPreferenceFragment.class.getName().equals(fragmentName);
+    }
+
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+    public static class LogPreferenceFragment extends PreferenceFragment {
+
+        @Override
+        public void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            addPreferencesFromResource(R.xml.pref_notification);
+            setHasOptionsMenu(true);
+
+            AsyncTask<Void, Preference, Void> settingsGetter;
+            settingsGetter = new getLog();
+            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+
+        }
+
+        private class getLog extends AsyncTask<Void, Preference, Void> {
+            @Override
+            protected Void doInBackground(Void... params) {
+                final Context context = getActivity();
+                boolean flag = false;
+                DatabaseHandler log = new DatabaseHandler(context);
+                ArrayList<Preference> stack = log.getLogEntries(context);
+                log.close();
+
+                PreferenceCategory cat = new PreferenceCategory(context);
+                EditTextPreference editTextBoxPreference;
+
+                for (Preference pref : stack) {
+                    if (flag) {
+                        editTextBoxPreference = (EditTextPreference) pref;
+                        publishProgress(cat, editTextBoxPreference);
+                    } else {
+                        cat = (PreferenceCategory) pref;
+                    }
+                    flag = !flag;
+                }
+                return null;
+            }
+
+            @Override
+            protected void onProgressUpdate(Preference... values) {
+                PreferenceCategory cat = new PreferenceCategory(getActivity());
+                PreferenceCategory catParam = (PreferenceCategory) values[0];
+                cat.setTitle(catParam.getTitle());
+                getPreferenceScreen().addPreference(cat);
+                cat.addPreference(values[1]);
+            }
+        }
     }
 
     /**
@@ -144,160 +196,174 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             addPreferencesFromResource(R.xml.pref_notification);
             setHasOptionsMenu(true);
 
-            final Context context = getActivity();
-            EditTextPreference editTextBoxPreference;
-            SwitchPreference switchPreference;
-            String packageName = "";
-            String flashBeat = "";
-            String includeWords = "";
-            String excludeWords = "";
-            String prefKey = "";
-            String value;
-            boolean notFirstItem = false;
+            AsyncTask<Void, Preference, Void> settingsGetter;
+            settingsGetter = new getSettings();
+            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        }
 
-            Intent myIntent = new Intent(context, NLService.class);
-            context.startService(myIntent);
+        private class getSettings extends AsyncTask<Void, Preference, Void> {
+            @Override
+            protected Void doInBackground(Void... params) {
+                final Context context = getActivity();
+                EditTextPreference editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3;
+                SwitchPreference switchPreference;
+                String packageName = "";
+                String flashBeat = "";
+                String includeWords = "";
+                String excludeWords = "";
+                String prefKey = "";
+                String value;
+                boolean notFirstItem = false;
 
-            // Bind the summaries of EditText/List/Dialog/Ringtone preferences
-            // to their values. When their values change, their summaries are
-            // updated to reflect the new value, per the Android Design
-            // guidelines.
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-            Map<String,?> keys = prefs.getAll();
+                Intent myIntent = new Intent(context, NLService.class);
+                context.startService(myIntent);
 
-            SortedSet<String> sortedKeys = new TreeSet<>(keys.keySet());
-            sortedKeys.add("z_1package");
-            for (String key : sortedKeys) {
-                try {
-                    value = keys.get(key).toString();
-                } catch (Exception ignore) {
-                    value = "";
-                }
-                if (key.endsWith("_1package")) {
-                    if (notFirstItem) {
-                        if (!packageName.equals("")) {
-                            PreferenceCategory cat = new PreferenceCategory(context);
-                            cat.setKey(prefKey);
-                            cat.setTitle("ID " + prefKey);
-                            getPreferenceScreen().addPreference(cat);
+                // Bind the summaries of EditText/List/Dialog/Ringtone preferences
+                // to their values. When their values change, their summaries are
+                // updated to reflect the new value, per the Android Design
+                // guidelines.
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+                Map<String, ?> keys = prefs.getAll();
 
-                            final ListPreference listPreference = new ListPreference(context);
-                            listPreference.setKey(prefKey + "_1package");
-                            listPreference.setTitle(getString(R.string.notification_package));
-                            listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                            setListPreferenceData(context, listPreference);
-                            int index = listPreference.findIndexOfValue(packageName);
-                            listPreference.setSummary(
-                                    listPreference.findIndexOfValue(packageName) >= 0
-                                            ? listPreference.getEntries()[index]
-                                            : getString(R.string.setting_delete));
-                            listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                                @Override
-                                public boolean onPreferenceClick(Preference preference) {
-                                    setListPreferenceData(context, listPreference);
-                                    return false;
-                                }
-                            });
-                            cat.addPreference(listPreference);
-
-                            editTextBoxPreference = new EditTextPreference(context);
-                            editTextBoxPreference.setKey(prefKey + "_2beat");
-                            editTextBoxPreference.setTitle(getString(R.string.notification_flash_beat));
-                            editTextBoxPreference.setSummary(flashBeat);
-                            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                            cat.addPreference(editTextBoxPreference);
-
-                            editTextBoxPreference = new EditTextPreference(context);
-                            editTextBoxPreference.setKey(prefKey + "_3include");
-                            editTextBoxPreference.setTitle(getString(R.string.notification_words_include));
-                            editTextBoxPreference.setSummary(includeWords);
-                            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                            cat.addPreference(editTextBoxPreference);
-
-                            editTextBoxPreference = new EditTextPreference(context);
-                            editTextBoxPreference.setKey(prefKey + "_4exclude");
-                            editTextBoxPreference.setTitle(getString(R.string.notification_words_exclude));
-                            editTextBoxPreference.setSummary(excludeWords);
-                            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                            cat.addPreference(editTextBoxPreference);
-
-                            switchPreference = new SwitchPreference(context);
-                            switchPreference.setKey(prefKey + "_5display");
-                            switchPreference.setTitle(getString(R.string.notification_display));
-                            switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                            cat.addPreference(switchPreference);
-                        }
+                SortedSet<String> sortedKeys = new TreeSet<>(keys.keySet());
+                sortedKeys.add("z_1package");
+                for (String key : sortedKeys) {
+                    try {
+                        value = keys.get(key).toString();
+                    } catch (Exception ignore) {
+                        value = "";
                     }
-                    notFirstItem = true;
-                    prefKey = key.split("_")[0];
-                    packageName = value;
-                    flashBeat = "";
-                    includeWords = "";
-                    excludeWords = "";
-                    if (packageName.equals("")) prefs.edit().remove(key).apply();
-                } else if (key.endsWith("_2beat")) {
-                    flashBeat = value;
-                    if (packageName.equals("")) prefs.edit().remove(key).apply();
-                } else if (key.endsWith("_3include")) {
-                    includeWords = value;
-                    if (packageName.equals("")) prefs.edit().remove(key).apply();
-                } else if (key.endsWith("_4exclude")) {
-                    excludeWords = value;
-                    if (packageName.equals("")) prefs.edit().remove(key).apply();
-                } else if (key.endsWith("_5display")) {
-                    if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    if (key.endsWith("_1package")) {
+                        if (notFirstItem) {
+                            if (!packageName.equals("")) {
+                                PreferenceCategory cat = new PreferenceCategory(context);
+                                cat.setKey(prefKey);
+                                cat.setTitle("ID " + prefKey);
+
+                                final ListPreference listPreference = new ListPreference(context);
+                                listPreference.setKey(prefKey + "_1package");
+                                listPreference.setTitle(getString(R.string.notification_package));
+                                listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                                setListPreferenceData(context, listPreference);
+                                int index = listPreference.findIndexOfValue(packageName);
+                                listPreference.setSummary(
+                                        listPreference.findIndexOfValue(packageName) >= 0
+                                                ? listPreference.getEntries()[index]
+                                                : getString(R.string.setting_delete));
+                                listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                                    @Override
+                                    public boolean onPreferenceClick(Preference preference) {
+                                        setListPreferenceData(context, listPreference);
+                                        return false;
+                                    }
+                                });
+
+                                editTextBoxPreference1 = new EditTextPreference(context);
+                                editTextBoxPreference1.setKey(prefKey + "_2beat");
+                                editTextBoxPreference1.setTitle(getString(R.string.notification_flash_beat));
+                                editTextBoxPreference1.setSummary(flashBeat);
+                                editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                                editTextBoxPreference2 = new EditTextPreference(context);
+                                editTextBoxPreference2.setKey(prefKey + "_3include");
+                                editTextBoxPreference2.setTitle(getString(R.string.notification_words_include));
+                                editTextBoxPreference2.setSummary(includeWords);
+                                editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                                editTextBoxPreference3 = new EditTextPreference(context);
+                                editTextBoxPreference3.setKey(prefKey + "_4exclude");
+                                editTextBoxPreference3.setTitle(getString(R.string.notification_words_exclude));
+                                editTextBoxPreference3.setSummary(excludeWords);
+                                editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                                switchPreference = new SwitchPreference(context);
+                                switchPreference.setKey(prefKey + "_5display");
+                                switchPreference.setTitle(getString(R.string.notification_display));
+                                switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                                publishProgress(cat, listPreference, editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3, switchPreference);
+                            }
+                        }
+                        notFirstItem = true;
+                        prefKey = key.split("_")[0];
+                        packageName = value;
+                        flashBeat = "";
+                        includeWords = "";
+                        excludeWords = "";
+                        if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    } else if (key.endsWith("_2beat")) {
+                        flashBeat = value;
+                        if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    } else if (key.endsWith("_3include")) {
+                        includeWords = value;
+                        if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    } else if (key.endsWith("_4exclude")) {
+                        excludeWords = value;
+                        if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    } else if (key.endsWith("_5display")) {
+                        if (packageName.equals("")) prefs.edit().remove(key).apply();
+                    }
                 }
+
+                prefKey = String.valueOf(Calendar.getInstance().getTimeInMillis());
+                PreferenceCategory cat = new PreferenceCategory(context);
+                cat.setKey(prefKey);
+                cat.setTitle("ID " + prefKey);
+
+                final ListPreference listPreference = new ListPreference(context);
+                listPreference.setKey(prefKey + "_1package");
+                listPreference.setTitle(getString(R.string.notification_package));
+                listPreference.setSummary("");
+                listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                setListPreferenceData(context, listPreference);
+                listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(Preference preference) {
+                        setListPreferenceData(context, listPreference);
+                        return false;
+                    }
+                });
+
+                editTextBoxPreference1 = new EditTextPreference(context);
+                editTextBoxPreference1.setKey(prefKey + "_2beat");
+                editTextBoxPreference1.setTitle(getString(R.string.notification_flash_beat));
+                editTextBoxPreference1.setSummary("");
+                editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                editTextBoxPreference2 = new EditTextPreference(context);
+                editTextBoxPreference2.setKey(prefKey + "_3include");
+                editTextBoxPreference2.setTitle(getString(R.string.notification_words_include));
+                editTextBoxPreference2.setSummary("");
+                editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                editTextBoxPreference3 = new EditTextPreference(context);
+                editTextBoxPreference3.setKey(prefKey + "_4exclude");
+                editTextBoxPreference3.setTitle(getString(R.string.notification_words_exclude));
+                editTextBoxPreference3.setSummary("");
+                editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                switchPreference = new SwitchPreference(context);
+                switchPreference.setKey(prefKey + "_5display");
+                switchPreference.setTitle(getString(R.string.notification_display));
+                switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+                publishProgress(cat, listPreference, editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3, switchPreference);
+                return null;
             }
 
-            prefKey = String.valueOf(Calendar.getInstance().getTimeInMillis());
-            PreferenceCategory cat = new PreferenceCategory(context);
-            cat.setKey(prefKey);
-            cat.setTitle("ID " + prefKey);
-            getPreferenceScreen().addPreference(cat);
-
-            final ListPreference listPreference = new ListPreference(context);
-            listPreference.setKey(prefKey + "_1package");
-            listPreference.setTitle(getString(R.string.notification_package));
-            listPreference.setSummary("");
-            listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-            setListPreferenceData(context, listPreference);
-            listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                @Override
-                public boolean onPreferenceClick(Preference preference) {
-                    setListPreferenceData(context, listPreference);
-                    return false;
-                }
-            });
-            cat.addPreference(listPreference);
-
-            editTextBoxPreference = new EditTextPreference(context);
-            editTextBoxPreference.setKey(prefKey + "_2beat");
-            editTextBoxPreference.setTitle(getString(R.string.notification_flash_beat));
-            editTextBoxPreference.setSummary("");
-            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-            cat.addPreference(editTextBoxPreference);
-
-            editTextBoxPreference = new EditTextPreference(context);
-            editTextBoxPreference.setKey(prefKey + "_3include");
-            editTextBoxPreference.setTitle(getString(R.string.notification_words_include));
-            editTextBoxPreference.setSummary("");
-            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-            cat.addPreference(editTextBoxPreference);
-
-            editTextBoxPreference = new EditTextPreference(context);
-            editTextBoxPreference.setKey(prefKey + "_4exclude");
-            editTextBoxPreference.setTitle(getString(R.string.notification_words_exclude));
-            editTextBoxPreference.setSummary("");
-            editTextBoxPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-            cat.addPreference(editTextBoxPreference);
-
-            switchPreference = new SwitchPreference(context);
-            switchPreference.setKey(prefKey + "_5display");
-            switchPreference.setTitle(getString(R.string.notification_display));
-            switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-            cat.addPreference(switchPreference);
-
-            //bindPreferenceSummaryToValue(findPreference("notifications_new_message_ringtone"));
+            @Override
+            protected void onProgressUpdate(Preference... values) {
+                PreferenceCategory cat = new PreferenceCategory(getActivity());
+                PreferenceCategory catParam = (PreferenceCategory) values[0];
+                cat.setKey(catParam.getKey());
+                cat.setTitle(catParam.getTitle());
+                getPreferenceScreen().addPreference(cat);
+                cat.addPreference(values[1]);
+                cat.addPreference(values[2]);
+                cat.addPreference(values[3]);
+                cat.addPreference(values[4]);
+                cat.addPreference(values[5]);
+            }
         }
     }
 }

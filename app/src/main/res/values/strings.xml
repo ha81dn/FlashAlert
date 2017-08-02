@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">FlashAlert</string>
-    <string name="pref_header_notifications">Benachrichtigungen</string>
+    <string name="pref_header_notifications">Einstellungen</string>
+    <string name="pref_header_log">Protokoll</string>
     <string name="setting_delete">(keine, Einstellung wird beim Verlassen gelöscht)</string>
     <string name="package_null">(Einstellung löschen)</string>
 
