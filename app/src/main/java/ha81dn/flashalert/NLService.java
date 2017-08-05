@@ -14,6 +14,7 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.view.Display;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -29,6 +30,7 @@ public class NLService extends NotificationListenerService {
         int flashCount = 0;
         String sbnPackageName;
         String sbnPackageLabel;
+        StringBuilder sbnTextBuilder = new StringBuilder();
         String sbnText = "";
         String[] list = {};
         CameraManager cm = null;
@@ -60,21 +62,21 @@ public class NLService extends NotificationListenerService {
                 ArrayList<String> charList = new ArrayList<>();
                 Bundle extras = sbn.getNotification().extras;
                 CharSequence chars = extras.getCharSequence(Notification.EXTRA_TITLE_BIG);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_TITLE);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_TEXT);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_INFO_TEXT);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_SUB_TEXT);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 chars = extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT);
-                addCharItem(charList, chars, sbnText);
+                addCharItem(charList, chars, sbnTextBuilder);
                 CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
                 if (lines != null && lines.length >= 1) {
                     StringBuilder sb = new StringBuilder();
@@ -84,8 +86,9 @@ public class NLService extends NotificationListenerService {
                             sb.append('\n');
                         }
                     if (sb.length() >= 1)
-                        addCharItem(charList, sb.toString(), sbnText);
+                        addCharItem(charList, sb.toString(), sbnTextBuilder);
                 }
+                sbnText = sbnTextBuilder.toString();
                 if (sbnText.length() >= 1 && sbnText.substring(sbnText.length() - 1, sbnText.length()).equals("\n"))
                     sbnText = sbnText.substring(0, sbnText.length() - 1);
 
@@ -99,6 +102,7 @@ public class NLService extends NotificationListenerService {
                     boolean notFirstItem = false;
                     boolean skip;
                     boolean flashNow;
+                    boolean notDefined = true;
                     long sleepMillis;
                     Map<String, ?> keys = prefs.getAll();
                     SortedSet<String> sortedKeys = new TreeSet<>(keys.keySet());
@@ -114,6 +118,7 @@ public class NLService extends NotificationListenerService {
                             if (key.endsWith("_1package")) {
                                 if (notFirstItem) {
                                     if (!packageName.equals("") && !flashBeat.equals("") && sbnPackageName.equals(packageName)) {
+                                        notDefined = false;
                                         if (!excludeWords.equals("")) {
                                             for (String ex : excludeWords.split(",")) {
                                                 if (sbnText.contains(ex)) {
@@ -190,11 +195,14 @@ public class NLService extends NotificationListenerService {
                             } else if (key.endsWith("_5display")) {
                                 displayOn = value;
                             }
+                            if (notDefined)
+                                log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_no_flash));
                         } catch (Exception ignore) {
                         }
                     }
                 }
-            } catch (Exception ignore) {
+            } catch (Exception ex) {
+                Toast.makeText(this, ex.getMessage(), Toast.LENGTH_LONG).show();
             }
             try {
                 if (hasFlashed) {
@@ -216,12 +224,13 @@ public class NLService extends NotificationListenerService {
         wakeLock.release();
     }
 
-    private void addCharItem(ArrayList<String> list, CharSequence chars, String plainText) {
+    private void addCharItem(ArrayList<String> list, CharSequence chars, StringBuilder plainText) {
         String tmp;
         if (!TextUtils.isEmpty(chars)) {
             tmp = chars.toString();
             if (!list.contains(tmp)) {
-                plainText += chars.toString() + '\n';
+                plainText.append(chars.toString());
+                plainText.append('\n');
                 list.add(tmp);
             }
         }
