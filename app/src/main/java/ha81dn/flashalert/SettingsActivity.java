@@ -81,6 +81,73 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                 & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_XLARGE;
     }
 
+    static void makeNewSettingsSet(final Context context, Preference cat, final Preference listPreference,
+                                   Preference editTextBoxPreference1, Preference editTextBoxPreference2,
+                                   Preference editTextBoxPreference3, Preference switchPreference) {
+        String prefKey = String.valueOf(Calendar.getInstance().getTimeInMillis());
+        cat.setKey(prefKey);
+        cat.setTitle("ID " + prefKey);
+
+        listPreference.setKey(prefKey + "_1package");
+        listPreference.setTitle(context.getString(R.string.notification_package));
+        listPreference.setSummary("");
+        listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+        setListPreferenceData(context, (ListPreference) listPreference);
+        listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                setListPreferenceData(context, (ListPreference) listPreference);
+                return false;
+            }
+        });
+
+        editTextBoxPreference1.setKey(prefKey + "_2beat");
+        editTextBoxPreference1.setTitle(context.getString(R.string.notification_flash_beat));
+        editTextBoxPreference1.setSummary("");
+        editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+        editTextBoxPreference2.setKey(prefKey + "_3include");
+        editTextBoxPreference2.setTitle(context.getString(R.string.notification_words_include));
+        editTextBoxPreference2.setSummary("");
+        editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+        editTextBoxPreference3.setKey(prefKey + "_4exclude");
+        editTextBoxPreference3.setTitle(context.getString(R.string.notification_words_exclude));
+        editTextBoxPreference3.setSummary("");
+        editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+
+        switchPreference.setKey(prefKey + "_5display");
+        switchPreference.setTitle(context.getString(R.string.notification_display));
+        switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+    }
+
+    protected static void setListPreferenceData(Context context, ListPreference lp) {
+        final PackageManager pm = context.getPackageManager();
+        List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        List<String> list = new ArrayList<>();
+        Map<String, String> map = new HashMap<>();
+
+        for (ApplicationInfo packageInfo : packages) {
+            try {
+                map.put(pm.getApplicationLabel(pm.getApplicationInfo(packageInfo.packageName, 0)).toString(), packageInfo.packageName);
+            } catch (Exception ignore) {
+            }
+        }
+        SortedSet<String> sortedKeys = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        sortedKeys.addAll(map.keySet());
+        for (String key : sortedKeys) {
+            list.add(key);
+        }
+        list.add(0, context.getResources().getString(R.string.package_null));
+        lp.setEntries(list.toArray(new CharSequence[list.size()]));
+        list.clear();
+        for (String key : sortedKeys) {
+            list.add(map.get(key));
+        }
+        list.add(0, "");
+        lp.setEntryValues(list.toArray(new CharSequence[list.size()]));
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -166,30 +233,6 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      */
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
     public static class NotificationPreferenceFragment extends PreferenceFragment {
-        protected static void setListPreferenceData(Context context, ListPreference lp) {
-            final PackageManager pm = context.getPackageManager();
-            List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-            List<String> list = new ArrayList<>();
-            Map<String, String> map = new HashMap<>();
-
-            for (ApplicationInfo packageInfo : packages) {
-                try {
-                    map.put(pm.getApplicationLabel(pm.getApplicationInfo(packageInfo.packageName, 0)).toString(), packageInfo.packageName);
-                } catch (Exception ignore) {}
-            }
-            SortedSet<String> sortedKeys = new TreeSet<>(map.keySet());
-            for (String key : sortedKeys) {
-                list.add(key);
-            }
-            list.add(0, context.getResources().getString(R.string.package_null));
-            lp.setEntries(list.toArray(new CharSequence[list.size()]));
-            list.clear();
-            for (String key : sortedKeys) {
-                list.add(map.get(key));
-            }
-            list.add(0, "");
-            lp.setEntryValues(list.toArray(new CharSequence[list.size()]));
-        }
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
@@ -306,48 +349,14 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                     }
                 }
 
-                prefKey = String.valueOf(Calendar.getInstance().getTimeInMillis());
                 PreferenceCategory cat = new PreferenceCategory(context);
-                cat.setKey(prefKey);
-                cat.setTitle("ID " + prefKey);
-
-                final ListPreference listPreference = new ListPreference(context);
-                listPreference.setKey(prefKey + "_1package");
-                listPreference.setTitle(getString(R.string.notification_package));
-                listPreference.setSummary("");
-                listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                setListPreferenceData(context, listPreference);
-                listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                    @Override
-                    public boolean onPreferenceClick(Preference preference) {
-                        setListPreferenceData(context, listPreference);
-                        return false;
-                    }
-                });
-
+                ListPreference listPreference = new ListPreference(context);
                 editTextBoxPreference1 = new EditTextPreference(context);
-                editTextBoxPreference1.setKey(prefKey + "_2beat");
-                editTextBoxPreference1.setTitle(getString(R.string.notification_flash_beat));
-                editTextBoxPreference1.setSummary("");
-                editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
                 editTextBoxPreference2 = new EditTextPreference(context);
-                editTextBoxPreference2.setKey(prefKey + "_3include");
-                editTextBoxPreference2.setTitle(getString(R.string.notification_words_include));
-                editTextBoxPreference2.setSummary("");
-                editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
                 editTextBoxPreference3 = new EditTextPreference(context);
-                editTextBoxPreference3.setKey(prefKey + "_4exclude");
-                editTextBoxPreference3.setTitle(getString(R.string.notification_words_exclude));
-                editTextBoxPreference3.setSummary("");
-                editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-
                 switchPreference = new SwitchPreference(context);
-                switchPreference.setKey(prefKey + "_5display");
-                switchPreference.setTitle(getString(R.string.notification_display));
-                switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
 
+                makeNewSettingsSet(context, cat, listPreference, editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3, switchPreference);
                 publishProgress(cat, listPreference, editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3, switchPreference);
                 return null;
             }

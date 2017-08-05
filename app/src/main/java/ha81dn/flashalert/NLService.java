@@ -195,11 +195,11 @@ public class NLService extends NotificationListenerService {
                             } else if (key.endsWith("_5display")) {
                                 displayOn = value;
                             }
-                            if (notDefined)
-                                log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_no_flash));
                         } catch (Exception ignore) {
                         }
                     }
+                    if (notDefined)
+                        log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_no_flash));
                 }
             } catch (Exception ex) {
                 Toast.makeText(this, ex.getMessage(), Toast.LENGTH_LONG).show();
