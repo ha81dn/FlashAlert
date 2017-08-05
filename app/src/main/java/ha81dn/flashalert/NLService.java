@@ -136,43 +136,47 @@ public class NLService extends NotificationListenerService {
                                             if (skip)
                                                 log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_not_include));
                                         }
-                                        if (!skip && (!isDisplayOn || displayOn.equals("true"))) {
-                                            if (log.hasFlashedRecently(5)) {
-                                                log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_recently));
-                                            } else {
-                                                flashCount = (int) Math.ceil((flashBeat.length() - flashBeat.replace(",", "").length()) / 2 + 0.5);
-                                                log.addLogEntry(sbnPackageLabel, sbnText, flashCount >= 1 ? new String(new char[flashCount]).replace("\0", "⚡") : "");
-                                                flashNow = true;
-                                                cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-                                                list = cm.getCameraIdList();
-                                                for (String item : flashBeat.split(",")) {
-                                                    if (flashNow) {
-                                                        for (String id : list) {
-                                                            try {
-                                                                hasFlashed = true;
-                                                                cm.setTorchMode(id, true);
-                                                            } catch (Exception ignore) {
+                                        if (!skip) {
+                                            if (!isDisplayOn || displayOn.equals("true")) {
+                                                if (log.hasFlashedRecently(5)) {
+                                                    log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_recently));
+                                                } else {
+                                                    flashCount = (int) Math.ceil((flashBeat.length() - flashBeat.replace(",", "").length()) / 2 + 0.5);
+                                                    log.addLogEntry(sbnPackageLabel, sbnText, flashCount >= 1 ? new String(new char[flashCount]).replace("\0", "⚡") : "");
+                                                    flashNow = true;
+                                                    cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+                                                    list = cm.getCameraIdList();
+                                                    for (String item : flashBeat.split(",")) {
+                                                        if (flashNow) {
+                                                            for (String id : list) {
+                                                                try {
+                                                                    hasFlashed = true;
+                                                                    cm.setTorchMode(id, true);
+                                                                } catch (Exception ignore) {
+                                                                }
                                                             }
                                                         }
-                                                    }
-                                                    try {
-                                                        sleepMillis = Long.parseLong(item.trim());
-                                                    } catch (Exception ignore) {
-                                                        sleepMillis = 100;
-                                                    }
-                                                    SystemClock.sleep(sleepMillis);
-                                                    if (flashNow) {
-                                                        for (String id : list) {
-                                                            try {
-                                                                cm.setTorchMode(id, false);
-                                                            } catch (Exception ignore) {
+                                                        try {
+                                                            sleepMillis = Long.parseLong(item.trim());
+                                                        } catch (Exception ignore) {
+                                                            sleepMillis = 100;
+                                                        }
+                                                        SystemClock.sleep(sleepMillis);
+                                                        if (flashNow) {
+                                                            for (String id : list) {
+                                                                try {
+                                                                    cm.setTorchMode(id, false);
+                                                                } catch (Exception ignore) {
+                                                                }
                                                             }
                                                         }
+                                                        flashNow = !flashNow;
                                                     }
-                                                    flashNow = !flashNow;
                                                 }
+                                                break;
+                                            } else {
+                                                log.addLogEntry(sbnPackageLabel, sbnText, getString(R.string.reason_display));
                                             }
-                                            break;
                                         }
                                     }
                                 }

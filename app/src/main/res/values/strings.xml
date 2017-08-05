@@ -8,6 +8,7 @@
     <string name="reason_not_include">kein Inklusivwort gefunden</string>
     <string name="reason_recently">es hat kurz zuvor geblitzt</string>
     <string name="reason_no_flash">kein Blitz vorgesehen</string>
+    <string name="reason_display">Bildschirm war eingeschaltet</string>
 
     <string name="notification_package">Benachrichtigende App</string>
     <string name="notification_flash_beat">Blitz-/Pausentakt (in ms, kommagetrennt)</string>
