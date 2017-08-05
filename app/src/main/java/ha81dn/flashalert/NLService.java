@@ -221,13 +221,18 @@ public class NLService extends NotificationListenerService {
     }
 
     private void addCharItem(ArrayList<String> list, CharSequence chars, StringBuilder plainText) {
-        String tmp;
         if (!TextUtils.isEmpty(chars)) {
-            tmp = chars.toString().trim();
-            if (!tmp.equals("") && !list.contains(tmp)) {
-                plainText.append(chars.toString());
-                plainText.append('\n');
-                list.add(tmp);
+            String tmp;
+            tmp = chars.toString();
+            if (!tmp.equals("")) {
+                for (String line : tmp.split("[\\n]+")) {
+                    tmp = line.trim();
+                    if (!tmp.equals("") && !list.contains(line)) {
+                        plainText.append(tmp);
+                        plainText.append('\n');
+                        list.add(line);
+                    }
+                }
             }
         }
     }
