@@ -31,7 +31,7 @@ public class NLService extends NotificationListenerService {
         String sbnPackageName;
         String sbnPackageLabel;
         StringBuilder sbnTextBuilder = new StringBuilder();
-        String sbnText = "";
+        String sbnText;
         String[] list = {};
         CameraManager cm = null;
 
