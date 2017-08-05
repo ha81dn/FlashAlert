@@ -79,14 +79,10 @@ public class NLService extends NotificationListenerService {
                 addCharItem(charList, chars, sbnTextBuilder);
                 CharSequence[] lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
                 if (lines != null && lines.length >= 1) {
-                    StringBuilder sb = new StringBuilder();
                     for (CharSequence msg : lines)
                         if (!TextUtils.isEmpty(msg)) {
-                            sb.append(msg.toString().trim());
-                            sb.append('\n');
+                            addCharItem(charList, msg, sbnTextBuilder);
                         }
-                    if (sb.length() >= 1)
-                        addCharItem(charList, sb.toString(), sbnTextBuilder);
                 }
                 sbnText = sbnTextBuilder.toString();
                 if (sbnText.length() >= 1 && sbnText.substring(sbnText.length() - 1, sbnText.length()).equals("\n"))
@@ -227,8 +223,8 @@ public class NLService extends NotificationListenerService {
     private void addCharItem(ArrayList<String> list, CharSequence chars, StringBuilder plainText) {
         String tmp;
         if (!TextUtils.isEmpty(chars)) {
-            tmp = chars.toString();
-            if (!list.contains(tmp)) {
+            tmp = chars.toString().trim();
+            if (!tmp.equals("") && !list.contains(tmp)) {
                 plainText.append(chars.toString());
                 plainText.append('\n');
                 list.add(tmp);
