@@ -27,7 +27,7 @@ public class NLService extends NotificationListenerService {
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         boolean hasFlashed = false;
-        int flashCount = 0;
+        int flashCount;
         String sbnPackageName;
         String sbnPackageLabel;
         StringBuilder sbnTextBuilder = new StringBuilder();
