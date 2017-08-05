@@ -197,16 +197,6 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             addPreferencesFromResource(R.xml.pref_notification);
             setHasOptionsMenu(true);
 
-            DatabaseHandler log = new DatabaseHandler(getActivity());
-            log.addLogEntry("test", "test", "irgendwas");
-
-            log.hasFlashedRecently(30);
-            log.equalsRecentNotification("test", "test", 30);
-
-            log.close();
-
-
-
             AsyncTask<Void, Preference, Void> settingsGetter;
             settingsGetter = new getSettings();
             settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
