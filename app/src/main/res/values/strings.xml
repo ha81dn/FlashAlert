@@ -4,6 +4,9 @@
     <string name="pref_header_log">Protokoll</string>
     <string name="setting_delete">(keine, Einstellung wird beim Verlassen gelöscht)</string>
     <string name="package_null">(Einstellung löschen)</string>
+    <string name="reason_exclude">Exklusivwort gefunden</string>
+    <string name="reason_not_include">kein Inklusivwort gefunden</string>
+    <string name="reason_recently">es hat kürzlich erst geblitzt</string>
 
     <string name="notification_package">Benachrichtigende App</string>
     <string name="notification_flash_beat">Blitz-/Pausentakt (in ms, kommagetrennt)</string>

@@ -155,6 +155,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                 cat.setTitle(catParam.getTitle());
                 getPreferenceScreen().addPreference(cat);
                 cat.addPreference(values[1]);
+                values[1].setSelectable(false);
             }
         }
     }
@@ -195,6 +196,16 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             super.onCreate(savedInstanceState);
             addPreferencesFromResource(R.xml.pref_notification);
             setHasOptionsMenu(true);
+
+            DatabaseHandler log = new DatabaseHandler(getActivity());
+            log.addLogEntry("test", "test", "irgendwas");
+
+            log.hasFlashedRecently(30);
+            log.equalsRecentNotification("test", "test", 30);
+
+            log.close();
+
+
 
             AsyncTask<Void, Preference, Void> settingsGetter;
             settingsGetter = new getSettings();

@@ -4,12 +4,12 @@
 
     <header
         android:fragment="ha81dn.flashalert.SettingsActivity$NotificationPreferenceFragment"
-        android:icon="@drawable/ic_flash_on_black_24dp"
+        android:icon="@drawable/ic_flash_on_white_24dp"
         android:title="@string/pref_header_notifications" />
 
     <header
         android:fragment="ha81dn.flashalert.SettingsActivity$LogPreferenceFragment"
-        android:icon="@drawable/ic_info_black_24dp"
+        android:icon="@drawable/ic_info_white_24dp"
         android:title="@string/pref_header_log" />
 
 </preference-headers>

@@ -23,6 +23,7 @@ class DatabaseHandler extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL("create table if not exists logfile (datim text primary key, app text, msg text, lit text)");
+        db.execSQL("create table if not exists recent (app text primary key, datim text, msg text)");
     }
 
     @Override
@@ -36,6 +37,73 @@ class DatabaseHandler extends SQLiteOpenHelper {
     public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         //db.execSQL("drop table if exists logfile");
         onCreate(db);
+    }
+
+    boolean equalsRecentNotification(String app, String msg, long recentSeconds) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor;
+        Calendar c1 = Calendar.getInstance();
+        Calendar c2;
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss", Locale.GERMAN);
+        boolean result = false;
+        boolean insert = true;
+
+        String datim, tmp;
+
+        // Zeitstempel formatieren
+        datim = sdf.format(c1.getTime());
+
+        cursor = db.rawQuery("select datim,msg from recent where app = ?", new String[]{app});
+        if (cursor.moveToFirst()) {
+            insert = false;
+            tmp = cursor.getString(1);
+            if (tmp.equals(msg)) {
+                tmp = cursor.getString(0);
+                try {
+                    if ((c1.getTime().getTime() - sdf.parse(tmp).getTime()) / 1000 <= recentSeconds)
+                        result = true;
+                } catch (Exception ignore) {
+                }
+            }
+        }
+
+        cursor.close();
+
+        ContentValues values = new ContentValues();
+        values.put("datim", datim);
+        values.put("msg", msg);
+        if (insert) {
+            values.put("app", app);
+            db.insert("recent", null, values);
+        } else {
+            db.update("recent", values, "app = ?", new String[]{app});
+        }
+
+        db.close();
+
+        return result;
+    }
+
+    boolean hasFlashedRecently(int seconds) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor;
+        Calendar c = Calendar.getInstance();
+        boolean result = false;
+
+        String datim, tmp;
+
+        // Zeitstempel formatieren
+        c.add(Calendar.SECOND, -seconds);
+        datim = new SimpleDateFormat("yyyyMMddHHmmss", Locale.GERMAN).format(c.getTime());
+        cursor = db.rawQuery("select count(*) from logfile where lit like '%⚡%' and datim >= ?", new String[]{datim});
+        if (cursor.moveToFirst()) {
+            if (!cursor.getString(0).equals("0")) result = true;
+        }
+
+        cursor.close();
+        db.close();
+
+        return result;
     }
 
     void addLogEntry(String app, String msg, String lit) {
@@ -61,11 +129,11 @@ class DatabaseHandler extends SQLiteOpenHelper {
             cursor.close();
         } while (true);
 
-        // nur die letzten 20 Einträge aufbewahren
+        // nur die letzten 30 Einträge aufbewahren
         cursor = db.rawQuery("select count(*) from logfile", null);
-        if (cursor.moveToFirst() && Integer.parseInt(cursor.getString(0)) >= 21) {
+        if (cursor.moveToFirst() && Integer.parseInt(cursor.getString(0)) >= 31) {
             cursor.close();
-            cursor = db.rawQuery("select min(datim) from logfile order by datim desc limit 21", null);
+            cursor = db.rawQuery("select min(datim) from logfile order by datim desc limit 31", null);
             if (cursor.moveToFirst()) {
                 db.execSQL("delete from logfile where datim <= ?", new String[]{cursor.getString(0)});
             }
