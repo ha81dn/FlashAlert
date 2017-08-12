@@ -129,13 +129,13 @@ class DatabaseHandler extends SQLiteOpenHelper {
             cursor.close();
         } while (true);
 
-        // nur die letzten 30 Einträge aufbewahren
-        cursor = db.rawQuery("select count(*) from logfile", null);
+        // pro App nur die letzten 30 Einträge aufbewahren
+        cursor = db.rawQuery("select count(*) from logfile where app = ?", new String[]{app});
         if (cursor.moveToFirst() && Integer.parseInt(cursor.getString(0)) >= 31) {
             cursor.close();
-            cursor = db.rawQuery("select min(datim) from logfile order by datim desc limit 31", null);
+            cursor = db.rawQuery("select min(datim) from logfile where app = ? order by datim desc limit 31", new String[]{app});
             if (cursor.moveToFirst()) {
-                db.execSQL("delete from logfile where datim <= ?", new String[]{cursor.getString(0)});
+                db.execSQL("delete from logfile where app = ? and datim <= ?", new String[]{app, cursor.getString(0)});
             }
             cursor.close();
         }
@@ -151,13 +151,16 @@ class DatabaseHandler extends SQLiteOpenHelper {
         db.close();
     }
 
-    ArrayList<Preference> getLogEntries(Context context) {
+    ArrayList<Preference> getLogEntries(Context context, String app) {
         SQLiteDatabase db = this.getReadableDatabase();
         ArrayList<Preference> stack = new ArrayList<>();
         Cursor cursor;
         String datim;
 
-        cursor = db.rawQuery("select datim,app,msg,lit from logfile order by datim desc", null);
+        if (app.equals(""))
+            cursor = db.rawQuery("select datim,app,msg,lit from logfile order by datim desc limit 30", null);
+        else
+            cursor = db.rawQuery("select datim,app,msg,lit from logfile where app = ? order by datim desc", new String[]{app});
         if (cursor.moveToFirst()) {
             // ermittelte Einträge zu einem Preference-Stapel zusammenfummeln
             do {

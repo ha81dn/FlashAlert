@@ -2,8 +2,10 @@ package ha81dn.flashalert;
 
 
 import android.annotation.TargetApi;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -44,7 +46,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      * A preference value change listener that updates the preference's summary
      * to reflect its new value.
      */
-    private static Preference.OnPreferenceChangeListener sBindPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
+    private static Preference.OnPreferenceChangeListener sBindNotificationPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object value) {
             String stringValue = value.toString();
@@ -63,6 +65,36 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
 
             } else if (preference instanceof SwitchPreference) {
                 return true;
+            } else {
+                // For all other preferences, set the summary to the value's
+                // simple string representation.
+                preference.setSummary(stringValue);
+            }
+            return true;
+        }
+    };
+
+    private static Preference.OnPreferenceChangeListener sBindLogPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
+        @Override
+        public boolean onPreferenceChange(Preference preference, Object value) {
+            String stringValue = value.toString();
+
+            if (preference instanceof ListPreference) {
+                // For list preferences, look up the correct display value in
+                // the preference's 'entries' list.
+                ListPreference listPreference = (ListPreference) preference;
+                int index = listPreference.findIndexOfValue(stringValue);
+
+                // Set the summary to reflect the new value.
+                preference.setSummary(
+                        index > 0
+                                ? listPreference.getEntries()[index]
+                                : preference.getContext().getResources().getString(R.string.log_filter_app_all));
+
+                Intent intentUpdate = new Intent();
+                intentUpdate.setAction("ha81dn.flashalert.ASYNC_MAIN");
+                intentUpdate.addCategory(Intent.CATEGORY_DEFAULT);
+                preference.getContext().sendBroadcast(intentUpdate);
             } else {
                 // For all other preferences, set the summary to the value's
                 // simple string representation.
@@ -91,12 +123,12 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         listPreference.setKey(prefKey + "_1package");
         listPreference.setTitle(context.getString(R.string.notification_package));
         listPreference.setSummary("");
-        listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-        setListPreferenceData(context, (ListPreference) listPreference);
+        listPreference.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
+        setListPreferenceData(context, (ListPreference) listPreference, context.getResources().getString(R.string.package_null));
         listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(Preference preference) {
-                setListPreferenceData(context, (ListPreference) listPreference);
+                setListPreferenceData(context, (ListPreference) listPreference, context.getResources().getString(R.string.package_null));
                 return false;
             }
         });
@@ -104,24 +136,24 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         editTextBoxPreference1.setKey(prefKey + "_2beat");
         editTextBoxPreference1.setTitle(context.getString(R.string.notification_flash_beat));
         editTextBoxPreference1.setSummary("");
-        editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+        editTextBoxPreference1.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
         editTextBoxPreference2.setKey(prefKey + "_3include");
         editTextBoxPreference2.setTitle(context.getString(R.string.notification_words_include));
         editTextBoxPreference2.setSummary("");
-        editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+        editTextBoxPreference2.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
         editTextBoxPreference3.setKey(prefKey + "_4exclude");
         editTextBoxPreference3.setTitle(context.getString(R.string.notification_words_exclude));
         editTextBoxPreference3.setSummary("");
-        editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+        editTextBoxPreference3.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
         switchPreference.setKey(prefKey + "_5display");
         switchPreference.setTitle(context.getString(R.string.notification_display));
-        switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+        switchPreference.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
     }
 
-    protected static void setListPreferenceData(Context context, ListPreference lp) {
+    protected static void setListPreferenceData(Context context, ListPreference lp, String firstEntry) {
         final PackageManager pm = context.getPackageManager();
         List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
         List<String> list = new ArrayList<>();
@@ -138,7 +170,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         for (String key : sortedKeys) {
             list.add(key);
         }
-        list.add(0, context.getResources().getString(R.string.package_null));
+        list.add(0, firstEntry);
         lp.setEntries(list.toArray(new CharSequence[list.size()]));
         list.clear();
         for (String key : sortedKeys) {
@@ -178,29 +210,88 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
 
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
     public static class LogPreferenceFragment extends PreferenceFragment {
+        private mainBroadcastReceiver mainBR;
 
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
             addPreferencesFromResource(R.xml.pref_notification);
             setHasOptionsMenu(true);
-
-            AsyncTask<Void, Preference, Void> settingsGetter;
-            settingsGetter = new getLog();
-            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-
+            loadPreferences();
         }
 
-        private class getLog extends AsyncTask<Void, Preference, Void> {
+        private void loadPreferences() {
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+
+            AsyncTask<String, Preference, Void> settingsGetter;
+            settingsGetter = new getLog();
+            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, prefs.getString("log_filter_app", ""));
+        }
+
+        @Override
+        public void onPause() {
+            super.onPause();
+            getActivity().unregisterReceiver(mainBR);
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            mainBR = new mainBroadcastReceiver();
+            IntentFilter intentFilter = new IntentFilter("ha81dn.flashalert.ASYNC_MAIN");
+            intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
+            getActivity().registerReceiver(mainBR, intentFilter);
+        }
+
+        private class getLog extends AsyncTask<String, Preference, Void> {
             @Override
-            protected Void doInBackground(Void... params) {
+            protected Void doInBackground(String... params) {
                 final Context context = getActivity();
+                String app = params[0];
                 boolean flag = false;
-                DatabaseHandler log = new DatabaseHandler(context);
-                ArrayList<Preference> stack = log.getLogEntries(context);
-                log.close();
 
                 PreferenceCategory cat = new PreferenceCategory(context);
+                cat.setTitle(getString(R.string.log_filter));
+
+                final ListPreference listPreference = new ListPreference(context);
+                listPreference.setKey("log_filter_app");
+                listPreference.setTitle(getString(R.string.notification_package));
+                listPreference.setOnPreferenceChangeListener(sBindLogPreferenceSummaryToValueListener);
+                setListPreferenceData(context, listPreference, getString(R.string.log_filter_app_all));
+                int index = listPreference.findIndexOfValue(app);
+                if (listPreference.findIndexOfValue(app) >= 0) {
+                    listPreference.setSummary(listPreference.getEntries()[index]);
+                } else {
+                    listPreference.setSummary(getString(R.string.log_filter_app_all));
+                    listPreference.setValue("");
+                    app = "";
+                }
+                listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(Preference preference) {
+                        setListPreferenceData(context, listPreference, context.getResources().getString(R.string.log_filter_app_all));
+                        return false;
+                    }
+                });
+
+                if (!app.equals("")) {
+                    final PackageManager pm = context.getPackageManager();
+                    try {
+                        app = pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString();
+                    } catch (Exception ignore) {
+                        listPreference.setSummary(getString(R.string.log_filter_app_all));
+                        listPreference.setValue("");
+                        app = "";
+                    }
+                }
+
+                publishProgress(cat, listPreference);
+
+                DatabaseHandler log = new DatabaseHandler(context);
+                ArrayList<Preference> stack = log.getLogEntries(context, app);
+                log.close();
+
+                cat = new PreferenceCategory(context);
                 EditTextPreference editTextBoxPreference;
 
                 for (Preference pref : stack) {
@@ -222,7 +313,15 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                 cat.setTitle(catParam.getTitle());
                 getPreferenceScreen().addPreference(cat);
                 cat.addPreference(values[1]);
-                values[1].setSelectable(false);
+                if (values[1] instanceof EditTextPreference) values[1].setSelectable(false);
+            }
+        }
+
+        public class mainBroadcastReceiver extends BroadcastReceiver {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                getPreferenceScreen().removeAll();
+                loadPreferences();
             }
         }
     }
@@ -287,8 +386,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                                 final ListPreference listPreference = new ListPreference(context);
                                 listPreference.setKey(prefKey + "_1package");
                                 listPreference.setTitle(getString(R.string.notification_package));
-                                listPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
-                                setListPreferenceData(context, listPreference);
+                                listPreference.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
+                                setListPreferenceData(context, listPreference, context.getResources().getString(R.string.package_null));
                                 int index = listPreference.findIndexOfValue(packageName);
                                 listPreference.setSummary(
                                         listPreference.findIndexOfValue(packageName) >= 0
@@ -297,7 +396,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                                 listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                                     @Override
                                     public boolean onPreferenceClick(Preference preference) {
-                                        setListPreferenceData(context, listPreference);
+                                        setListPreferenceData(context, listPreference, context.getResources().getString(R.string.package_null));
                                         return false;
                                     }
                                 });
@@ -306,24 +405,24 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                                 editTextBoxPreference1.setKey(prefKey + "_2beat");
                                 editTextBoxPreference1.setTitle(getString(R.string.notification_flash_beat));
                                 editTextBoxPreference1.setSummary(flashBeat);
-                                editTextBoxPreference1.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                                editTextBoxPreference1.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
                                 editTextBoxPreference2 = new EditTextPreference(context);
                                 editTextBoxPreference2.setKey(prefKey + "_3include");
                                 editTextBoxPreference2.setTitle(getString(R.string.notification_words_include));
                                 editTextBoxPreference2.setSummary(includeWords);
-                                editTextBoxPreference2.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                                editTextBoxPreference2.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
                                 editTextBoxPreference3 = new EditTextPreference(context);
                                 editTextBoxPreference3.setKey(prefKey + "_4exclude");
                                 editTextBoxPreference3.setTitle(getString(R.string.notification_words_exclude));
                                 editTextBoxPreference3.setSummary(excludeWords);
-                                editTextBoxPreference3.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                                editTextBoxPreference3.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
                                 switchPreference = new SwitchPreference(context);
                                 switchPreference.setKey(prefKey + "_5display");
                                 switchPreference.setTitle(getString(R.string.notification_display));
-                                switchPreference.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+                                switchPreference.setOnPreferenceChangeListener(sBindNotificationPreferenceSummaryToValueListener);
 
                                 publishProgress(cat, listPreference, editTextBoxPreference1, editTextBoxPreference2, editTextBoxPreference3, switchPreference);
                             }
