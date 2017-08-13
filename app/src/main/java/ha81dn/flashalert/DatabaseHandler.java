@@ -151,16 +151,16 @@ class DatabaseHandler extends SQLiteOpenHelper {
         db.close();
     }
 
-    ArrayList<Preference> getLogEntries(Context context, String app) {
+    ArrayList<Preference> getLogEntries(Context context, ArrayList<String> app) {
         SQLiteDatabase db = this.getReadableDatabase();
         ArrayList<Preference> stack = new ArrayList<>();
         Cursor cursor;
         String datim;
 
-        if (app.equals(""))
+        if (app.size() == 0)
             cursor = db.rawQuery("select datim,app,msg,lit from logfile order by datim desc limit 30", null);
         else
-            cursor = db.rawQuery("select datim,app,msg,lit from logfile where app = ? order by datim desc", new String[]{app});
+            cursor = db.rawQuery("select datim,app,msg,lit from logfile where app in (" + makePlaceholders(app.size()) + ") order by datim desc", app.toArray(new String[app.size()]));
         if (cursor.moveToFirst()) {
             // ermittelte Einträge zu einem Preference-Stapel zusammenfummeln
             do {
@@ -182,5 +182,19 @@ class DatabaseHandler extends SQLiteOpenHelper {
         cursor.close();
 
         return stack;
+    }
+
+    private String makePlaceholders(int len) {
+        if (len < 1) {
+            // It will lead to an invalid query anyway ..
+            return "0";
+        } else {
+            StringBuilder sb = new StringBuilder(len * 2 - 1);
+            sb.append("?");
+            for (int i = 1; i < len; i++) {
+                sb.append(",?");
+            }
+            return sb.toString();
+        }
     }
 }

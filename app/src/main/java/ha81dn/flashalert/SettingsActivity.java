@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.EditTextPreference;
 import android.preference.ListPreference;
+import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceCategory;
@@ -25,8 +26,10 @@ import android.preference.SwitchPreference;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -77,28 +80,11 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     private static Preference.OnPreferenceChangeListener sBindLogPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object value) {
-            String stringValue = value.toString();
-
-            if (preference instanceof ListPreference) {
-                // For list preferences, look up the correct display value in
-                // the preference's 'entries' list.
-                ListPreference listPreference = (ListPreference) preference;
-                int index = listPreference.findIndexOfValue(stringValue);
-
-                // Set the summary to reflect the new value.
-                preference.setSummary(
-                        index > 0
-                                ? listPreference.getEntries()[index]
-                                : preference.getContext().getResources().getString(R.string.log_filter_app_all));
-
+            if (preference instanceof MultiSelectListPreference) {
                 Intent intentUpdate = new Intent();
                 intentUpdate.setAction("ha81dn.flashalert.ASYNC_MAIN");
                 intentUpdate.addCategory(Intent.CATEGORY_DEFAULT);
                 preference.getContext().sendBroadcast(intentUpdate);
-            } else {
-                // For all other preferences, set the summary to the value's
-                // simple string representation.
-                preference.setSummary(stringValue);
             }
             return true;
         }
@@ -180,6 +166,31 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         lp.setEntryValues(list.toArray(new CharSequence[list.size()]));
     }
 
+    protected static void setListPreferenceData(Context context, MultiSelectListPreference lp) {
+        final PackageManager pm = context.getPackageManager();
+        List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        List<String> list = new ArrayList<>();
+        Map<String, String> map = new HashMap<>();
+
+        for (ApplicationInfo packageInfo : packages) {
+            try {
+                map.put(pm.getApplicationLabel(pm.getApplicationInfo(packageInfo.packageName, 0)).toString(), packageInfo.packageName);
+            } catch (Exception ignore) {
+            }
+        }
+        SortedSet<String> sortedKeys = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        sortedKeys.addAll(map.keySet());
+        for (String key : sortedKeys) {
+            list.add(key);
+        }
+        lp.setEntries(list.toArray(new CharSequence[list.size()]));
+        list.clear();
+        for (String key : sortedKeys) {
+            list.add(map.get(key));
+        }
+        lp.setEntryValues(list.toArray(new CharSequence[list.size()]));
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -223,9 +234,9 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         private void loadPreferences() {
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
 
-            AsyncTask<String, Preference, Void> settingsGetter;
+            AsyncTask<Set<String>, Preference, Void> settingsGetter;
             settingsGetter = new getLog();
-            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, prefs.getString("log_filter_app", ""));
+            settingsGetter.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, prefs.getStringSet("log_filter_app", new HashSet<String>()));
         }
 
         @Override
@@ -243,52 +254,57 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             getActivity().registerReceiver(mainBR, intentFilter);
         }
 
-        private class getLog extends AsyncTask<String, Preference, Void> {
+        private class getLog extends AsyncTask<Set<String>, Preference, Void> {
             @Override
-            protected Void doInBackground(String... params) {
+            protected Void doInBackground(Set<String>... params) {
                 final Context context = getActivity();
-                String app = params[0];
+                Set<String> app = params[0];
+                ArrayList<String> oldApps = new ArrayList<>();
+                ArrayList<String> sqlApps = new ArrayList<>();
                 boolean flag = false;
 
                 PreferenceCategory cat = new PreferenceCategory(context);
                 cat.setTitle(getString(R.string.log_filter));
 
-                final ListPreference listPreference = new ListPreference(context);
+                final MultiSelectListPreference listPreference = new MultiSelectListPreference(context);
                 listPreference.setKey("log_filter_app");
                 listPreference.setTitle(getString(R.string.notification_package));
                 listPreference.setOnPreferenceChangeListener(sBindLogPreferenceSummaryToValueListener);
-                setListPreferenceData(context, listPreference, getString(R.string.log_filter_app_all));
-                int index = listPreference.findIndexOfValue(app);
-                if (listPreference.findIndexOfValue(app) >= 0) {
-                    listPreference.setSummary(listPreference.getEntries()[index]);
-                } else {
+                setListPreferenceData(context, listPreference);
+                StringBuilder summary = new StringBuilder();
+                SortedSet<String> sList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+                for (String item : app) {
+                    String label = item;
+                    int pos = listPreference.findIndexOfValue(item);
+                    if (pos >= 0) {
+                        label = listPreference.getEntries()[pos].toString();
+                        sList.add(label);
+                        sqlApps.add(label);
+                    } else
+                        oldApps.add(item);
+                }
+                if (oldApps.size() >= 1) {
+                    for (String item : oldApps) {
+                        app.remove(item);
+                    }
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+                    SharedPreferences.Editor editor = prefs.edit();
+                    editor.putStringSet("log_filter_app", app);
+                    editor.apply();
+                }
+                for (String item : sList) {
+                    summary.append(", ");
+                    summary.append(item);
+                }
+                if (summary.length() >= 1)
+                    listPreference.setSummary(summary.toString().substring(2));
+                else
                     listPreference.setSummary(getString(R.string.log_filter_app_all));
-                    listPreference.setValue("");
-                    app = "";
-                }
-                listPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                    @Override
-                    public boolean onPreferenceClick(Preference preference) {
-                        setListPreferenceData(context, listPreference, context.getResources().getString(R.string.log_filter_app_all));
-                        return false;
-                    }
-                });
-
-                if (!app.equals("")) {
-                    final PackageManager pm = context.getPackageManager();
-                    try {
-                        app = pm.getApplicationLabel(pm.getApplicationInfo(app, 0)).toString();
-                    } catch (Exception ignore) {
-                        listPreference.setSummary(getString(R.string.log_filter_app_all));
-                        listPreference.setValue("");
-                        app = "";
-                    }
-                }
 
                 publishProgress(cat, listPreference);
 
                 DatabaseHandler log = new DatabaseHandler(context);
-                ArrayList<Preference> stack = log.getLogEntries(context, app);
+                ArrayList<Preference> stack = log.getLogEntries(context, sqlApps);
                 log.close();
 
                 cat = new PreferenceCategory(context);
