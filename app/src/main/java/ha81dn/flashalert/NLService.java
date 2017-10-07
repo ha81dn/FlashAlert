@@ -90,6 +90,7 @@ public class NLService extends NotificationListenerService {
 
                 if (!log.equalsRecentNotification(sbnPackageLabel, sbnText, 5)) {
                     String packageName = "";
+                    String packageLabel;
                     String flashBeat = "";
                     String includeWords = "";
                     String excludeWords = "";
@@ -113,7 +114,12 @@ public class NLService extends NotificationListenerService {
                         try {
                             if (key.endsWith("_1package")) {
                                 if (notFirstItem) {
-                                    if (!packageName.equals("") && !flashBeat.equals("") && sbnPackageName.equals(packageName)) {
+                                    try {
+                                        packageLabel = pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString();
+                                    } catch (Exception ignore) {
+                                        packageLabel = packageName;
+                                    }
+                                    if (!packageName.equals("") && !flashBeat.equals("") && sbnPackageLabel.equals(packageLabel)) {
                                         notDefined = false;
                                         if (!excludeWords.equals("")) {
                                             for (String ex : excludeWords.split(",")) {

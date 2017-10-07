@@ -2,13 +2,13 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.0"
+    buildToolsVersion "26.0.1"
     defaultConfig {
         applicationId "ha81dn.flashalert"
         minSdkVersion 24
         targetSdkVersion 26
         versionCode 1
-        versionName "1.1"
+        versionName "1.2"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -24,8 +24,11 @@ dependencies {
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
+    //noinspection GradleDynamicVersion
     compile 'com.android.support:appcompat-v7:26.+'
+    //noinspection GradleDynamicVersion
     compile 'com.android.support:support-v4:26.+'
+    //noinspection GradleDynamicVersion
     compile 'com.android.support:preference-v14:26.+'
     testCompile 'junit:junit:4.12'
 }
